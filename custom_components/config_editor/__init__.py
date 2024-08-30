@@ -29,7 +29,7 @@ async def async_setup(hass, config):
 async def websocket_create(hass, connection, msg):
     action = msg["action"]
     ext = msg["ext"]
-    if ext not in ["yaml","py","json","conf","js","txt","log","css","all"]:
+    if ext not in ["yaml","py","json","conf","js","txt","log","css","csv","all"]:
         ext = "yaml"
 
     def extok(e):
@@ -38,13 +38,14 @@ async def websocket_create(hass, connection, msg):
         return ( ext == 'all' or e.endswith("."+ext) )
 
     def rec(p, q):
+        _LOGGER.info('rec '+p)
         r = [
-            f for f in os.listdir(p) if os.path.isfile(os.path.join(p, f)) and
+            os.path.join(p, f) for f in os.listdir(p) if os.path.isfile(os.path.join(p, f)) and
             extok(f)
         ]
         for j in r:
             p = j if q == '' else os.path.join(q, j)
-            listyaml.append(p)
+            listyaml.append(j)
 
     def drec(r, s):
         for d in os.listdir(r):
@@ -54,13 +55,15 @@ async def websocket_create(hass, connection, msg):
                 if(p.count(os.sep) < msg["depth"]) and ( ext == 'all' or p != 'custom_components' ):
                     rec(v, p)
                     drec(v, p)
-
-    yamlname = msg["file"].replace("../", "/").strip('/')
+                    
+    #yamlname = msg["file"].replace("../", "/").strip('/')
+    yamlname = msg["file"]
 
     if not extok(msg["file"]):
         yamlname = "temptest."+ext
         
-    fullpath = hass.config.path(yamlname)
+    #fullpath = hass.config.path(yamlname)
+    fullpath = yamlname
     if (action == 'load'):
         _LOGGER.info('Loading '+fullpath)
         content = ''
@@ -121,8 +124,10 @@ async def websocket_create(hass, connection, msg):
         dirnm = os.path.dirname(hass.config.path(yamlname))
         listyaml = []
         rec(dirnm, '')
+        rec('../share', '')
         if msg["depth"]>0:
             drec(dirnm, '')
+            drec('../share', '')
         if (len(listyaml) < 1):
             listyaml = ['list_error.'+ext]
         connection.send_result(
